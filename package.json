@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "dev": "concurrently \"npm start --prefix Backend\" \"npm start --prefix frontend\" \"npm start --prefix dashboard\""
+  },
+  "dependencies": {
+    "react-router-dom": "^7.18.3"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
