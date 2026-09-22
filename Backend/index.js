@@ -10,6 +10,7 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const authRoute = require("./Routes/AuthRoute");
+const { protectRoute } = require("./Middlewares/AuthMiddleware");
 const { MONGO_URL} = process.env;
 
 
@@ -220,7 +221,14 @@ app.use("/", authRoute);
 // res.send("allDone!");
 // })
 
-app.post("/newOrder", async (req, res) => {
+app.get("/me", protectRoute, (req, res) => {
+  res.status(200).json({
+    success: true,
+    user: req.user,
+  });
+});
+
+app.post("/newOrder", protectRoute,async (req, res) => {
   console.log("REQUEST BODY:", req.body);
   try {
     const { name, qty, price, mode } = req.body;
@@ -235,6 +243,7 @@ app.post("/newOrder", async (req, res) => {
 
       // Save BUY order
       const newOrder = new OrdersModel({
+        userId: req.user._id,
         name,
         qty: newQty,
         price: newPrice,
@@ -244,7 +253,9 @@ app.post("/newOrder", async (req, res) => {
       await newOrder.save();
 
       // Check if stock already exists in holdings
-      const existingHolding = await HoldingsModel.findOne({ name });
+      const existingHolding = await HoldingsModel.findOne({ 
+        userId:req.user._id,
+        name });
 
       if (existingHolding) {
 
@@ -266,6 +277,7 @@ app.post("/newOrder", async (req, res) => {
 
         // First time buying this stock
         const newHolding = new HoldingsModel({
+          userId: req.user._id,
           name,
           qty: newQty,
           avg: newPrice,
@@ -290,7 +302,9 @@ app.post("/newOrder", async (req, res) => {
     if (mode === "SELL") {
 
       // 1. Check whether stock exists
-      const existingHolding = await HoldingsModel.findOne({ name });
+      const existingHolding = await HoldingsModel.findOne({ 
+        userId: req.user._id,
+        name });
 
       if (!existingHolding) {
         return res.status(400).json({
@@ -313,6 +327,7 @@ app.post("/newOrder", async (req, res) => {
 
       // 3. Save SELL order
       const newOrder = new OrdersModel({
+        userId: req.user._id,
         name,
         qty: newQty,
         price: newPrice,
@@ -366,30 +381,54 @@ app.post("/newOrder", async (req, res) => {
   }
 });
 
-app.get("/addHoldings", async(req,res)=>{
-    let addHoldings = await HoldingsModel.find({});
-    res.json(addHoldings);
-});
-
-app.get("/addPositions", async(req,res)=>{
-    let addPositions = await PositionsModel.find({});
-    res.json(addPositions);
-});
-app.get("/allOrders", async (req, res) => {
+app.get("/addHoldings", protectRoute, async (req, res) => {
   try {
-
-    const orders = await OrdersModel.find({});
-
-    res.json(orders);
-
-  } catch (error) {
-
-    console.log(error);
-
-    res.status(500).json({
-      message: "Failed to fetch orders",
+    const holdings = await HoldingsModel.find({
+      userId: req.user._id,
     });
 
+    res.json(holdings);
+  } catch (error) {
+    console.log("HOLDINGS ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch holdings",
+    });
+  }
+});
+
+app.get("/addPositions", protectRoute, async (req, res) => {
+  try {
+    const positions = await PositionsModel.find({
+      userId: req.user._id,
+    });
+
+    res.json(positions);
+  } catch (error) {
+    console.log("POSITIONS ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch positions",
+    });
+  }
+});
+
+app.get("/allOrders", protectRoute, async (req, res) => {
+  try {
+    const orders = await OrdersModel.find({
+      userId: req.user._id,
+    });
+
+    res.json(orders);
+  } catch (error) {
+    console.log("ORDERS ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+    });
   }
 });
 

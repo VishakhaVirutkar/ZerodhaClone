@@ -8,7 +8,9 @@ import {VerticalGraph} from "./VerticalGraph";
     const [allHoldings, setAllHoldings] = useState([]);
     
     useEffect(()=>{
-      axios.get("http://localhost:3002/addHoldings").then((res)=>{
+      axios.get(`${process.env.REACT_APP_API_URL}/addHoldings`, {
+  withCredentials: true,
+}).then((res)=>{
         console.log(res.data);
         setAllHoldings(res.data);
       });

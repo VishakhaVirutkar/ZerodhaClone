@@ -11,7 +11,9 @@ const Orders = () => {
   useEffect(() => {
 
     axios
-      .get("http://localhost:3002/allOrders")
+      .get(`${process.env.REACT_APP_API_URL}/allOrders`, {
+       withCredentials: true,
+       })
       .then((res) => {
 
         console.log("ORDERS:", res.data);

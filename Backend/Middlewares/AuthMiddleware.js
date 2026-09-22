@@ -51,43 +51,46 @@ const userVerification = async (req, res) => {
 // ==============================
 
 const protectRoute = async (req, res, next) => {
+  try {
+    const token = req.cookies.token;
 
-    try {
+    console.log("TOKEN RECEIVED:", token ? "YES" : "NO");
+    console.log("TOKEN KEY EXISTS:", !!process.env.TOKEN_KEY);
 
-        const token = req.cookies.token;
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
 
-        if (!token) {
-            return res.status(401).json({
-                success: false,
-                message: "Authentication required"
-            });
-        }
+    const decoded = jwt.verify(
+      token,
+      process.env.TOKEN_KEY
+    );
 
-        const decoded = jwt.verify(
-            token,
-            process.env.TOKEN_KEY
-        );
+    console.log("DECODED TOKEN:", decoded);
 
-        const user = await User.findById(decoded.id)
-            .select("-password");
+    const user = await User.findById(decoded.id).select("-password");
 
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: "User not found"
-            });
-        }
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
-        req.user = user;
+    req.user = user;
 
-        next();
+    next();
 
-    } catch (error) {
+  } catch (error) {
+    console.log("AUTH ERROR:", error.message);
 
-        return res.status(401).json({
-            success: false,
-            message: "Invalid or expired token"
-        });
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
 
     }
 };

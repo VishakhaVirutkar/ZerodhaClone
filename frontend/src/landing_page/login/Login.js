@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 
 const Login = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [inputValue, setInputValue] = useState({
     email: "",
     password: "",
@@ -30,25 +30,22 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-      console.log("API URL:", process.env.REACT_APP_API_URL);
-  console.log(
-    "Login URL:",
-    `${process.env.REACT_APP_API_URL}/login`
-  );
     try {
+      console.log("API URL:", process.env.REACT_APP_API_URL);
+      console.log("Login URL:", `${process.env.REACT_APP_API_URL}/login`);
       const { data } = await axios.post(
         `${process.env.REACT_APP_API_URL}/login`,
         {
           ...inputValue,
         },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       console.log(data);
       const { success, message } = data;
       if (success) {
         handleSuccess(message);
         setTimeout(() => {
-          navigate("/");
+          window.location.href = "http://localhost:3000/";
         }, 1000);
       } else {
         handleError(message);
