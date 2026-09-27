@@ -8,7 +8,7 @@ import { VerticalGraph } from "./VerticalGraph";
 const Holdings = () => {
   const [allHoldings, setAllHoldings] = useState([]);
 
-  const { openSellWindow } = useContext(GeneralContext);
+  const { openSellWindow , refreshData} = useContext(GeneralContext);
 
   useEffect(() => {
     axios
@@ -19,7 +19,7 @@ const Holdings = () => {
         console.log(res.data);
         setAllHoldings(res.data);
       });
-  }, []);
+  }, [refreshData]);
 
   const totalInvestment = allHoldings.reduce(
   (total, stock) =>

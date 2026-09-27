@@ -7,7 +7,7 @@ import axios from "axios";
 const Positions = () => {
   const [allPositions, setAllPositions] = useState([]);
 
-  const { openSellWindow } = useContext(GeneralContext);
+  const { openSellWindow , refreshData} = useContext(GeneralContext);
 
   useEffect(() => {
     axios
@@ -18,7 +18,7 @@ const Positions = () => {
         console.log(res.data);
         setAllPositions(res.data);
       });
-  }, []);
+  }, [refreshData]);
 
   const totalPositionValue = allPositions.reduce(
   (total, stock) =>

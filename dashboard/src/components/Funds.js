@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useContext } from "react";
+import GeneralContext from "./GeneralContext";
 
 const Funds = () => {
 
   const [balance, setBalance] = useState(0);
   const [marginUsed, setMarginUsed] = useState(0);
+   const [openingBalance, setOpeningBalance] = useState(0);
+
+  const { refreshData } = useContext(GeneralContext);
 
   useEffect(() => {
 
@@ -21,7 +26,7 @@ const Funds = () => {
         console.log("FUNDS ERROR:", error);
       });
 
-  }, []);
+  }, [refreshData]);
 
   return (
     <>

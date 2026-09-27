@@ -8,7 +8,7 @@ const SellActionWindow = ({ uid, product}) => {
   const [stockPrice, setStockPrice] = useState(0);
   
 
-  const { closeSellWindow } = useContext(GeneralContext);
+  const { closeSellWindow, handleRefreshData } = useContext(GeneralContext);
 
   const handleSellClick = async () => {
 
@@ -37,7 +37,7 @@ const SellActionWindow = ({ uid, product}) => {
       );
 
       console.log(response.data);
-
+        handleRefreshData();
       closeSellWindow();
 
     } catch (error) {

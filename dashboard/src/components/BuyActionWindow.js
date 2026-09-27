@@ -10,7 +10,7 @@ const BuyActionWindow = ({ uid }) => {
   const [product, setProduct] = useState("CNC");
 
   // Get function from context
-  const { closeBuyWindow } = useContext(GeneralContext);
+  const { closeBuyWindow , handleRefreshData} = useContext(GeneralContext);
 
   const handleBuyClick = async () => {
     try {
@@ -36,7 +36,7 @@ const BuyActionWindow = ({ uid }) => {
       );
 
       console.log("BUY RESPONSE:", response.data);
-
+      handleRefreshData();
       closeBuyWindow();
     } catch (error) {
       console.log("BUY ERROR:", error);

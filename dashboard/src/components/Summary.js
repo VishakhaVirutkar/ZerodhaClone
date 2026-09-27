@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useContext } from "react";
+import GeneralContext from "./GeneralContext";
 
 const Summary = () => {
   const [balance, setBalance] = useState(0);
@@ -8,6 +10,8 @@ const Summary = () => {
 
   const [holdings, setHoldings] = useState([]);
   const [positions, setPositions] = useState([]);
+
+  const { refreshData } = useContext(GeneralContext);
 
   useEffect(() => {
     // Fetch funds
@@ -53,7 +57,7 @@ const Summary = () => {
       .catch((error) => {
         console.log("SUMMARY POSITIONS ERROR:", error);
       });
-  }, []);
+  }, [refreshData]);
 
   // -------------------------
   // HOLDINGS CALCULATIONS
