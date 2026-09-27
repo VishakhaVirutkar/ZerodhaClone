@@ -2,10 +2,11 @@ import React, { useState, useContext } from "react";
 import axios from "axios";
 import GeneralContext from "./GeneralContext";
 
-const SellActionWindow = ({ uid }) => {
+const SellActionWindow = ({ uid, product}) => {
 
   const [stockQuantity, setStockQuantity] = useState(1);
   const [stockPrice, setStockPrice] = useState(0);
+  
 
   const { closeSellWindow } = useContext(GeneralContext);
 
@@ -13,14 +14,26 @@ const SellActionWindow = ({ uid }) => {
 
     try {
 
+      console.log("SELL DATA:", {
+  name: uid,
+  qty: Number(stockQuantity),
+  price: Number(stockPrice),
+  mode: "SELL",
+  product: product,
+});
+
       const response = await axios.post(
-        "http://localhost:3002/newOrder",
+        `${process.env.REACT_APP_API_URL}/newOrder`,
         {
           name: uid,
-          qty: stockQuantity,
-          price: stockPrice,
+          qty: Number(stockQuantity),
+          price: Number(stockPrice),
           mode: "SELL",
-        }
+          product,
+        },
+        {
+    withCredentials: true,
+  }
       );
 
       console.log(response.data);

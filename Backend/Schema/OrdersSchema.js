@@ -9,7 +9,12 @@ const OrdersSchema = new Schema({
   name:String,
   qty:Number,
   price:Number,
-  mode:String
+  mode:String,
+   product: {
+    type: String,
+    enum: ["CNC", "MIS"],
+    default: "CNC",
+  }
 })
 
 module.exports = {OrdersSchema}

@@ -15,6 +15,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, "Your password is required"],
   },
+  balance: {
+  type: Number,
+  default: 100000,
+},
+openingBalance: {
+  type: Number,
+  default: 100000,
+},
+marginUsed: {
+  type: Number,
+  default: 0,
+},
   createdAt: {
     type: Date,
     default: new Date(),
@@ -22,6 +34,10 @@ const userSchema = new mongoose.Schema({
 });
 
 userSchema.pre("save", async function () {
+  if (!this.isModified("password")) {
+    return;
+  }
+
   this.password = await bcrypt.hash(this.password, 12);
 });
 

@@ -1,8 +1,7 @@
 const dns = require("dns");
 dns.setServers(["8.8.8.8"]);
 
-
-require ("dotenv").config();
+require("dotenv").config();
 
 const express = require("express");
 const mongoose = require("mongoose");
@@ -11,42 +10,36 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const authRoute = require("./Routes/AuthRoute");
 const { protectRoute } = require("./Middlewares/AuthMiddleware");
-const { MONGO_URL} = process.env;
-
+const { MONGO_URL } = process.env;
 
 mongoose
   .connect(MONGO_URL)
   .then(() => console.log("MongoDB is  connected successfully"))
   .catch((err) => console.error(err));
 
-const {HoldingsModel} = require("./model/Holdingsmodel");
-const {PositionsModel} = require("./model/PositionsModel");
-const {OrdersModel} = require("./model/OrdersModel");
+const { HoldingsModel } = require("./model/Holdingsmodel");
+const { PositionsModel } = require("./model/PositionsModel");
+const { OrdersModel } = require("./model/OrdersModel");
 const User = require("./model/UsersModel");
 
 const PORT = process.env.PORT || 3002;
 // const url = process.env.MONGO_URL;
 
-const app= express();
+const app = express();
 
-
-
-const allowedOrigins = [
-    "http://localhost:3000",
-    "http://localhost:3001"
-];
+const allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
 
 app.use(
-    cors({
-        origin: function (origin, callback) {
-            if (!origin || allowedOrigins.includes(origin)) {
-                callback(null, true);
-            } else {
-                callback(new Error("Not allowed by CORS"));
-            }
-        },
-        credentials: true
-    })
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
 );
 app.use(cookieParser());
 app.use(bodyParser.json());
@@ -228,10 +221,10 @@ app.get("/me", protectRoute, (req, res) => {
   });
 });
 
-app.post("/newOrder", protectRoute,async (req, res) => {
+app.post("/newOrder", protectRoute, async (req, res) => {
   console.log("REQUEST BODY:", req.body);
   try {
-    const { name, qty, price, mode } = req.body;
+    const { name, qty, price, mode, product } = req.body;
 
     const newQty = Number(qty);
     const newPrice = Number(price);
@@ -240,6 +233,106 @@ app.post("/newOrder", protectRoute,async (req, res) => {
     // BUY
     // =========================
     if (mode === "BUY") {
+      // MIS BUY
+      // =========================
+      if (product === "MIS") {
+        // 1. Calculate total order value
+        const orderValue = newQty * newPrice;
+
+        // 2. Simulated leverage
+        const leverage = 5;
+
+        // 3. Calculate required margin
+        const requiredMargin = orderValue / leverage;
+
+        // 4. Check available balance
+        if (req.user.balance < requiredMargin) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient margin. Required: ₹${requiredMargin}, Available: ₹${req.user.balance}`,
+          });
+        }
+
+        // 5. Deduct required margin
+        req.user.balance -= requiredMargin;
+        req.user.marginUsed += requiredMargin;
+
+        await req.user.save();
+
+        // 6. Create MIS order
+        const newOrder = new OrdersModel({
+          userId: req.user._id,
+          name,
+          qty: newQty,
+          price: newPrice,
+          mode: "BUY",
+          product: "MIS",
+        });
+
+        await newOrder.save();
+
+        // 7. Check existing MIS position
+        const existingPosition = await PositionsModel.findOne({
+          userId: req.user._id,
+          name,
+          product: "MIS",
+        });
+
+        if (existingPosition) {
+          const oldQty = Number(existingPosition.qty);
+          const oldAvg = Number(existingPosition.avg);
+
+          const totalQty = oldQty + newQty;
+
+          const newAvg = (oldQty * oldAvg + newQty * newPrice) / totalQty;
+
+          existingPosition.qty = totalQty;
+          existingPosition.avg = newAvg;
+          existingPosition.price = newPrice;
+
+          await existingPosition.save();
+        } else {
+          // 8. Create new MIS position
+          const newPosition = new PositionsModel({
+            userId: req.user._id,
+            product: "MIS",
+            name,
+            qty: newQty,
+            avg: newPrice,
+            price: newPrice,
+            net: "0%",
+            day: "0%",
+            isLoss: false,
+          });
+
+          await newPosition.save();
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: "MIS BUY order placed successfully",
+          orderValue,
+          requiredMargin,
+          balance: req.user.balance,
+          marginUsed: req.user.marginUsed,
+        });
+      }
+
+      //=====CNC MODE CHECK=====
+      // 1. Calculate total order value
+      const orderValue = newQty * newPrice;
+
+      // 2. Check whether user has enough balance
+      if (req.user.balance < orderValue) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient funds. Available balance: ₹${req.user.balance}`,
+        });
+      }
+
+      // 3. Deduct money from user's balance
+      req.user.balance -= orderValue;
+      await req.user.save();
 
       // Save BUY order
       const newOrder = new OrdersModel({
@@ -248,33 +341,31 @@ app.post("/newOrder", protectRoute,async (req, res) => {
         qty: newQty,
         price: newPrice,
         mode: "BUY",
+        product: "CNC",
       });
 
       await newOrder.save();
 
       // Check if stock already exists in holdings
-      const existingHolding = await HoldingsModel.findOne({ 
-        userId:req.user._id,
-        name });
+      const existingHolding = await HoldingsModel.findOne({
+        userId: req.user._id,
+        name,
+      });
 
       if (existingHolding) {
-
         const oldQty = Number(existingHolding.qty);
         const oldAvg = Number(existingHolding.avg);
 
         const totalQty = oldQty + newQty;
 
-        const newAvg =
-          ((oldQty * oldAvg) + (newQty * newPrice)) / totalQty;
+        const newAvg = (oldQty * oldAvg + newQty * newPrice) / totalQty;
 
         existingHolding.qty = totalQty;
         existingHolding.avg = newAvg;
         existingHolding.price = newPrice;
 
         await existingHolding.save();
-
       } else {
-
         // First time buying this stock
         const newHolding = new HoldingsModel({
           userId: req.user._id,
@@ -295,16 +386,103 @@ app.post("/newOrder", protectRoute,async (req, res) => {
       });
     }
 
-
     // =========================
     // SELL
     // =========================
     if (mode === "SELL") {
+      // =========================
+      // MIS SELL
+      // =========================
+      if (product === "MIS") {
+        // 1. Find MIS position
+        const existingPosition = await PositionsModel.findOne({
+          userId: req.user._id,
+          name,
+          product: "MIS",
+        });
 
+        if (!existingPosition) {
+          return res.status(400).json({
+            success: false,
+            message: `You don't have an MIS position in ${name}`,
+          });
+        }
+
+        // 2. Check quantity
+        const availableQty = Number(existingPosition.qty);
+
+        if (newQty > availableQty) {
+          return res.status(400).json({
+            success: false,
+            message: `Not enough quantity. You have only ${availableQty} shares of ${name}`,
+          });
+        }
+
+        // 3. Calculate P&L
+        const avgPrice = Number(existingPosition.avg);
+
+        const realizedPnl = (newPrice - avgPrice) * newQty;
+
+        // 4. Calculate original margin
+        const leverage = 5;
+
+        const orderValue = newQty * avgPrice;
+
+        const requiredMargin = orderValue / leverage;
+
+        // 5. Release margin + P&L
+        req.user.balance += requiredMargin + realizedPnl;
+         req.user.marginUsed -= requiredMargin;
+        await req.user.save();
+
+        // 6. Save MIS SELL order
+        const newOrder = new OrdersModel({
+          userId: req.user._id,
+          name,
+          qty: newQty,
+          price: newPrice,
+          mode: "SELL",
+          product: "MIS",
+        });
+
+        await newOrder.save();
+
+        // 7. Reduce / remove position
+        const remainingQty = availableQty - newQty;
+
+        if (remainingQty === 0) {
+          await PositionsModel.deleteOne({
+            _id: existingPosition._id,
+          });
+        } else {
+          existingPosition.qty = remainingQty;
+
+          await existingPosition.save();
+        }
+
+        // 8. Send response
+        return res.status(200).json({
+          success: true,
+          message: "MIS SELL order placed successfully",
+          orderValue: newQty * newPrice,
+          requiredMargin,
+          realizedPnl,
+          balance: req.user.balance,
+           marginUsed: req.user.marginUsed,
+               });
+        // });
+      }
+    }
+
+    // // =========================
+    // CNC  SELL
+    // =========================
+    if (mode === "SELL") {
       // 1. Check whether stock exists
-      const existingHolding = await HoldingsModel.findOne({ 
+      const existingHolding = await HoldingsModel.findOne({
         userId: req.user._id,
-        name });
+        name,
+      });
 
       if (!existingHolding) {
         return res.status(400).json({
@@ -312,7 +490,6 @@ app.post("/newOrder", protectRoute,async (req, res) => {
           message: `You don't own ${name}`,
         });
       }
-
 
       // 2. Check available quantity
       const availableQty = Number(existingHolding.qty);
@@ -324,43 +501,54 @@ app.post("/newOrder", protectRoute,async (req, res) => {
         });
       }
 
+      // 3. Calculate sale value
+      const saleValue = newQty * newPrice;
 
-      // 3. Save SELL order
+      // 4. Calculate realized P&L
+      const avgPrice = Number(existingHolding.avg);
+
+      const realizedPnl = (newPrice - avgPrice) * newQty;
+
+      // 5. Credit sale proceeds to user's balance
+      req.user.balance += saleValue;
+
+      await req.user.save();
+
+      // 6. Save SELL order
       const newOrder = new OrdersModel({
         userId: req.user._id,
         name,
         qty: newQty,
         price: newPrice,
         mode: "SELL",
+        product: "CNC",
       });
 
       await newOrder.save();
 
-
-      // 4. Reduce holding quantity
+      // 7. Reduce holding quantity
       const remainingQty = availableQty - newQty;
 
       if (remainingQty === 0) {
-
         // No shares left → remove holding
-        await HoldingsModel.deleteOne({ _id: existingHolding._id });
-
+        await HoldingsModel.deleteOne({
+          _id: existingHolding._id,
+        });
       } else {
-
         // Shares still remaining
         existingHolding.qty = remainingQty;
 
         await existingHolding.save();
       }
 
-
       return res.status(200).json({
         success: true,
         message: "SELL order placed successfully",
+        saleValue,
+        realizedPnl,
+        balance: req.user.balance,
       });
     }
-
-
     // =========================
     // INVALID MODE
     // =========================
@@ -369,9 +557,7 @@ app.post("/newOrder", protectRoute,async (req, res) => {
       success: false,
       message: "Invalid order mode",
     });
-
   } catch (error) {
-
     console.log("ORDER ERROR:", error);
 
     res.status(500).json({
@@ -432,13 +618,29 @@ app.get("/allOrders", protectRoute, async (req, res) => {
   }
 });
 
-app.listen(PORT, ()=>{
-    console.log(`Server is running on port ${PORT}`);
-    //  mongoose.connect(url)
-    //     .then(() => {
-    //         console.log("MongoDB connected");
-    //     })
-    //     .catch((err) => {
-    //         console.log("MongoDB connection failed:", err);
-    //     });
-})
+app.get("/funds", protectRoute, async (req, res) => {
+  try {
+    res.status(200).json({
+      balance: req.user.balance,
+      marginUsed: req.user.marginUsed,
+      openingBalance: req.user.openingBalance,
+    });
+  } catch (error) {
+    console.log("FUNDS ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  //  mongoose.connect(url)
+  //     .then(() => {
+  //         console.log("MongoDB connected");
+  //     })
+  //     .catch((err) => {
+  //         console.log("MongoDB connection failed:", err);
+  //     });
+});
